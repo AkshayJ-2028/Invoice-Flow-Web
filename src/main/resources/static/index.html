@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invoice Flow</title>
+<style>
+  :root { --navy:#1b3a5c; --blue:#2563eb; --bg:#f3f4f6; --line:#e5e7eb; --text:#1f2937; --muted:#6b7280; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Arial, Helvetica, sans-serif; background:var(--bg); color:var(--text); }
+  [hidden] { display:none !important; }
+  .center { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:20px; }
+  h1,h2,h3 { margin:0 0 12px; color:var(--navy); }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input, select, textarea { width:100%; padding:9px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:14px; }
+  button { background:var(--blue); color:#fff; border:0; border-radius:6px; padding:9px 14px; font-size:14px; cursor:pointer; }
+  button.secondary { background:#fff; color:var(--navy); border:1px solid #cbd5e1; }
+  button.danger { background:#dc2626; }
+  button.small { padding:5px 9px; font-size:12px; }
+  .msg { margin-top:10px; font-size:13px; }
+  .err { color:#dc2626; } .ok { color:#16a34a; }
+  header { background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:space-between; padding:12px 20px; }
+  header b { font-size:18px; }
+  nav { display:flex; gap:8px; padding:12px 20px; background:#fff; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  nav button { background:#fff; color:var(--navy); border:1px solid #cbd5e1; }
+  nav button.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+  main { max-width:1000px; margin:20px auto; padding:0 16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  .stat .v { font-size:22px; font-weight:bold; color:var(--navy); }
+  .stat .l { font-size:13px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { background:var(--navy); color:#fff; text-align:left; padding:8px; }
+  td { padding:8px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; } .row > * { flex:1; min-width:140px; }
+  .tag { padding:2px 8px; border-radius:10px; font-size:12px; background:#e5e7eb; }
+  .tag.PAID { background:#dcfce7; color:#166534; } .tag.SENT { background:#dbeafe; color:#1e40af; }
+  .tag.OVERDUE { background:#fee2e2; color:#991b1b; } .tag.DRAFT { background:#f3f4f6; }
+  .scroll { overflow-x:auto; }
+  .item-row { display:flex; gap:8px; margin-bottom:8px; } .item-row select { flex:3; } .item-row input { flex:1; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN / REGISTER -->
+<div id="auth" class="center">
+  <div class="card" style="width:100%;max-width:380px">
+    <h1>Invoice Flow</h1>
+    <div id="nameBox" hidden><label>Name</label><input id="name"></div>
+    <label>Email</label><input id="email" type="email">
+    <label>Password (min 6 characters)</label><input id="password" type="password">
+    <div style="margin-top:14px" class="row">
+      <button id="authBtn" onclick="submitAuth()">Login</button>
+      <button class="secondary" onclick="toggleMode()" id="toggleBtn">Create account</button>
+    </div>
+    <div id="authMsg" class="msg err"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" hidden>
+  <header><b>Invoice Flow</b><span><span id="who"></span> &nbsp; <button class="secondary small" onclick="logout()">Logout</button></span></header>
+  <nav id="tabs">
+    <button data-t="dash" class="active">Dashboard</button>
+    <button data-t="clients">Clients</button>
+    <button data-t="products">Products</button>
+    <button data-t="invoices">Invoices</button>
+  </nav>
+  <main>
+    <div id="msg" class="msg"></div>
+
+    <section id="dash">
+      <div class="grid" id="stats"></div>
+    </section>
+
+    <section id="clients" hidden>
+      <div class="card">
+        <h3>Add client</h3>
+        <div class="row">
+          <div><label>Name *</label><input id="c_name"></div>
+          <div><label>Email</label><input id="c_email"></div>
+          <div><label>Phone</label><input id="c_phone"></div>
+        </div>
+        <div class="row">
+          <div><label>Address</label><input id="c_address"></div>
+          <div><label>GST number</label><input id="c_gst"></div>
+        </div>
+        <div style="margin-top:12px"><button onclick="addClient()">Save client</button></div>
+      </div>
+      <div class="card scroll" style="margin-top:14px"><table id="clientTable"></table></div>
+    </section>
+
+    <section id="products" hidden>
+      <div class="card">
+        <h3>Add product / service</h3>
+        <div class="row">
+          <div><label>Name *</label><input id="p_name"></div>
+          <div><label>Description</label><input id="p_desc"></div>
+          <div><label>Unit price *</label><input id="p_price" type="number" min="0" step="0.01"></div>
+          <div><label>Tax %</label><input id="p_tax" type="number" min="0" step="0.01" value="18"></div>
+        </div>
+        <div style="margin-top:12px"><button onclick="addProduct()">Save product</button></div>
+      </div>
+      <div class="card scroll" style="margin-top:14px"><table id="productTable"></table></div>
+    </section>
+
+    <section id="invoices" hidden>
+      <div class="card">
+        <h3>New invoice</h3>
+        <div class="row">
+          <div><label>Client *</label><select id="i_client"></select></div>
+          <div><label>Discount (Rs.)</label><input id="i_discount" type="number" min="0" step="0.01" value="0"></div>
+        </div>
+        <label>Items</label>
+        <div id="items"></div>
+        <button class="secondary small" onclick="addItemRow()">+ Add item</button>
+        <label>Notes</label><textarea id="i_notes" rows="2"></textarea>
+        <div style="margin-top:12px"><button onclick="createInvoice()">Create invoice</button></div>
+      </div>
+      <div class="card scroll" style="margin-top:14px"><table id="invoiceTable"></table></div>
+    </section>
+  </main>
+</div>
+
+<script>
+let token = null;
+try { token = localStorage.getItem('token'); } catch (e) {}
+let mode = 'login';
+let clients = [], products = [];
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = n => 'Rs. ' + Number(n || 0).toFixed(2);
+
+async function api(path, opts = {}) {
+  const headers = {'Content-Type': 'application/json'};
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const res = await fetch(path, Object.assign({}, opts, {headers}));
+  if (res.status === 403 && token && !path.startsWith('/api/auth')) { logout(); throw new Error('Session expired. Please login again.'); }
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch (e) {}
+  if (!res.ok) throw new Error((data && data.message) || 'Request failed (' + res.status + '). Please check your input.');
+  return data;
+}
+
+function say(text, ok) {
+  $('msg').textContent = text || '';
+  $('msg').className = 'msg ' + (ok ? 'ok' : 'err');
+  if (text) setTimeout(() => { $('msg').textContent = ''; }, 4000);
+}
+
+/* ---------- auth ---------- */
+function toggleMode() {
+  mode = mode === 'login' ? 'register' : 'login';
+  $('nameBox').hidden = mode === 'login';
+  $('authBtn').textContent = mode === 'login' ? 'Login' : 'Register';
+  $('toggleBtn').textContent = mode === 'login' ? 'Create account' : 'Back to login';
+  $('authMsg').textContent = '';
+}
+
+async function submitAuth() {
+  try {
+    const body = {email: $('email').value.trim(), password: $('password').value};
+    if (mode === 'register') body.name = $('name').value.trim();
+    const data = await api('/api/auth/' + mode, {method: 'POST', body: JSON.stringify(body)});
+    token = data.token;
+    try { localStorage.setItem('token', token); localStorage.setItem('who', data.name); } catch (e) {}
+    $('who').textContent = data.name;
+    start();
+  } catch (e) { $('authMsg').textContent = e.message; }
+}
+
+function logout() {
+  token = null;
+  try { localStorage.removeItem('token'); } catch (e) {}
+  $('app').hidden = true;
+  $('auth').hidden = false;
+}
+
+function start() {
+  $('auth').hidden = true;
+  $('app').hidden = false;
+  try { $('who').textContent = localStorage.getItem('who') || ''; } catch (e) {}
+  showTab('dash');
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => showTab(b.dataset.t));
+
+function showTab(t) {
+  ['dash','clients','products','invoices'].forEach(s => $(s).hidden = s !== t);
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+  if (t === 'dash') loadDash();
+  if (t === 'clients') loadClients();
+  if (t === 'products') loadProducts();
+  if (t === 'invoices') loadInvoicesPage();
+}
+
+/* ---------- dashboard ---------- */
+async function loadDash() {
+  try {
+    const s = await api('/api/dashboard/summary');
+    const items = [
+      ['Total invoices', s.totalInvoices], ['Total billed', money(s.totalAmount)],
+      ['Paid', money(s.paidAmount)], ['Pending (sent)', money(s.pendingAmount)],
+      ['Overdue', money(s.overdueAmount)], ['Drafts', s.draftCount]
+    ];
+    $('stats').innerHTML = items.map(i =>
+      '<div class="card stat"><div class="v">' + esc(i[1]) + '</div><div class="l">' + esc(i[0]) + '</div></div>').join('');
+  } catch (e) { say(e.message); }
+}
+
+/* ---------- clients ---------- */
+async function loadClients() {
+  try {
+    clients = await api('/api/clients');
+    $('clientTable').innerHTML = '<tr><th>Name</th><th>Email</th><th>Phone</th><th>Address</th><th>GST</th><th></th></tr>' +
+      clients.map(c => '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.email) + '</td><td>' + esc(c.phone) +
+        '</td><td>' + esc(c.address) + '</td><td>' + esc(c.gstNumber) +
+        '</td><td><button class="danger small" onclick="delClient(' + c.id + ')">Delete</button></td></tr>').join('');
+  } catch (e) { say(e.message); }
+}
+async function addClient() {
+  try {
+    await api('/api/clients', {method: 'POST', body: JSON.stringify({
+      name: $('c_name').value.trim(), email: $('c_email').value.trim(), phone: $('c_phone').value.trim(),
+      address: $('c_address').value.trim(), gstNumber: $('c_gst').value.trim()})});
+    ['c_name','c_email','c_phone','c_address','c_gst'].forEach(i => $(i).value = '');
+    say('Client saved', true); loadClients();
+  } catch (e) { say(e.message); }
+}
+async function delClient(id) {
+  if (!confirm('Delete this client?')) return;
+  try { await api('/api/clients/' + id, {method: 'DELETE'}); loadClients(); } catch (e) { say(e.message); }
+}
+
+/* ---------- products ---------- */
+async function loadProducts() {
+  try {
+    products = await api('/api/products');
+    $('productTable').innerHTML = '<tr><th>Name</th><th>Description</th><th>Unit price</th><th>Tax %</th><th></th></tr>' +
+      products.map(p => '<tr><td>' + esc(p.name) + '</td><td>' + esc(p.description) + '</td><td>' + money(p.unitPrice) +
+        '</td><td>' + esc(p.taxPercent) + '%</td><td><button class="danger small" onclick="delProduct(' + p.id + ')">Delete</button></td></tr>').join('');
+  } catch (e) { say(e.message); }
+}
+async function addProduct() {
+  try {
+    await api('/api/products', {method: 'POST', body: JSON.stringify({
+      name: $('p_name').value.trim(), description: $('p_desc').value.trim(),
+      unitPrice: parseFloat($('p_price').value), taxPercent: parseFloat($('p_tax').value || 0)})});
+    ['p_name','p_desc','p_price'].forEach(i => $(i).value = '');
+    say('Product saved', true); loadProducts();
+  } catch (e) { say(e.message); }
+}
+async function delProduct(id) {
+  if (!confirm('Delete this product?')) return;
+  try { await api('/api/products/' + id, {method: 'DELETE'}); loadProducts(); } catch (e) { say(e.message); }
+}
+
+/* ---------- invoices ---------- */
+async function loadInvoicesPage() {
+  try {
+    clients = await api('/api/clients');
+    products = await api('/api/products');
+    $('i_client').innerHTML = clients.map(c => '<option value="' + c.id + '">' + esc(c.name) + '</option>').join('');
+    if ($('items').children.length === 0) addItemRow();
+    else refreshItemOptions();
+    loadInvoices();
+  } catch (e) { say(e.message); }
+}
+function productOptions() {
+  return products.map(p => '<option value="' + p.id + '">' + esc(p.name) + ' (' + money(p.unitPrice) + ', ' + esc(p.taxPercent) + '%)</option>').join('');
+}
+function addItemRow() {
+  const d = document.createElement('div');
+  d.className = 'item-row';
+  d.innerHTML = '<select>' + productOptions() + '</select><input type="number" min="1" value="1">' +
+    '<button class="danger small" onclick="this.parentNode.remove()">X</button>';
+  $('items').appendChild(d);
+}
+function refreshItemOptions() {
+  document.querySelectorAll('#items select').forEach(s => { const v = s.value; s.innerHTML = productOptions(); s.value = v; });
+}
+async function createInvoice() {
+  try {
+    const items = [...document.querySelectorAll('#items .item-row')].map(r => ({
+      productId: parseInt(r.querySelector('select').value),
+      quantity: parseInt(r.querySelector('input').value || 1)}));
+    if (!$('i_client').value) throw new Error('Add a client first');
+    if (items.length === 0 || items.some(i => !i.productId)) throw new Error('Add a product first and select at least one item');
+    await api('/api/invoices', {method: 'POST', body: JSON.stringify({
+      clientId: parseInt($('i_client').value), discount: parseFloat($('i_discount').value || 0),
+      notes: $('i_notes').value, items: items})});
+    $('i_notes').value = ''; $('i_discount').value = 0;
+    say('Invoice created', true); loadInvoices();
+  } catch (e) { say(e.message); }
+}
+async function loadInvoices() {
+  try {
+    const list = await api('/api/invoices');
+    $('invoiceTable').innerHTML = '<tr><th>Number</th><th>Client</th><th>Due</th><th>Total</th><th>Status</th><th>Actions</th></tr>' +
+      list.map(i => '<tr><td>' + esc(i.invoiceNumber) + '</td><td>' + esc(i.clientName) + '</td><td>' + esc(i.dueDate) +
+        '</td><td>' + money(i.grandTotal) + '</td><td><span class="tag ' + esc(i.status) + '">' + esc(i.status) + '</span></td><td>' +
+        '<select onchange="setStatus(' + i.id + ', this.value)">' +
+        ['DRAFT','SENT','PAID','OVERDUE','CANCELLED'].map(s => '<option' + (s === i.status ? ' selected' : '') + '>' + s + '</option>').join('') +
+        '</select> <button class="small" onclick="downloadPdf(' + i.id + ', \'' + esc(i.invoiceNumber) + '\')">PDF</button> ' +
+        '<button class="danger small" onclick="delInvoice(' + i.id + ')">Delete</button></td></tr>').join('');
+  } catch (e) { say(e.message); }
+}
+async function setStatus(id, value) {
+  try { await api('/api/invoices/' + id + '/status?value=' + value, {method: 'PATCH'}); loadInvoices(); } catch (e) { say(e.message); }
+}
+async function delInvoice(id) {
+  if (!confirm('Delete this invoice?')) return;
+  try { await api('/api/invoices/' + id, {method: 'DELETE'}); loadInvoices(); } catch (e) { say(e.message); }
+}
+async function downloadPdf(id, number) {
+  try {
+    const res = await fetch('/api/invoices/' + id + '/pdf', {headers: {Authorization: 'Bearer ' + token}});
+    if (!res.ok) throw new Error('Could not download PDF');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = number + '.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) { say(e.message); }
+}
+
+if (token) start();
+</script>
+</body>
+</html>
